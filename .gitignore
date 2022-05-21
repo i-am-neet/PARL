@@ -107,4 +107,6 @@ ENV/
 
 # trained model
 saved_model/
+model/
+train_log/
 

@@ -40,8 +40,9 @@ class MAModel(parl.Model):
 class ActorModel(parl.Model):
     def __init__(self, obs_dim, act_dim):
         super(ActorModel, self).__init__()
-        hid1_size = 64
-        hid2_size = 64
+        hid1_size = 128
+        hid2_size = 128
+        hid3_size = 64
         self.fc1 = nn.Linear(
             obs_dim,
             hid1_size,
@@ -54,6 +55,11 @@ class ActorModel(parl.Model):
                 initializer=paddle.nn.initializer.XavierUniform()))
         self.fc3 = nn.Linear(
             hid2_size,
+            hid3_size,
+            weight_attr=paddle.ParamAttr(
+                initializer=paddle.nn.initializer.XavierUniform()))
+        self.fc4 = nn.Linear(
+            hid3_size,
             act_dim,
             weight_attr=paddle.ParamAttr(
                 initializer=paddle.nn.initializer.XavierUniform()))
@@ -61,15 +67,17 @@ class ActorModel(parl.Model):
     def forward(self, obs):
         hid1 = F.relu(self.fc1(obs))
         hid2 = F.relu(self.fc2(hid1))
-        means = self.fc3(hid2)
+        hid3 = F.relu(self.fc3(hid2))
+        means = self.fc4(hid3)
         return means
 
 
 class CriticModel(parl.Model):
     def __init__(self, critic_in_dim):
         super(CriticModel, self).__init__()
-        hid1_size = 64
-        hid2_size = 64
+        hid1_size = 128
+        hid2_size = 128
+        hid3_size = 64
         out_dim = 1
         self.fc1 = nn.Linear(
             critic_in_dim,
@@ -83,6 +91,11 @@ class CriticModel(parl.Model):
                 initializer=paddle.nn.initializer.XavierUniform()))
         self.fc3 = nn.Linear(
             hid2_size,
+            hid3_size,
+            weight_attr=paddle.ParamAttr(
+                initializer=paddle.nn.initializer.XavierUniform()))
+        self.fc4 = nn.Linear(
+            hid3_size,
             out_dim,
             weight_attr=paddle.ParamAttr(
                 initializer=paddle.nn.initializer.XavierUniform()))
@@ -91,6 +104,7 @@ class CriticModel(parl.Model):
         inputs = paddle.concat(obs_n + act_n, axis=1)
         hid1 = F.relu(self.fc1(inputs))
         hid2 = F.relu(self.fc2(hid1))
-        Q = self.fc3(hid2)
+        hid3 = F.relu(self.fc3(hid2))
+        Q = self.fc4(hid3)
         Q = paddle.squeeze(Q, axis=1)
         return Q

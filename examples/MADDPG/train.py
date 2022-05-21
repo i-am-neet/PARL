@@ -21,16 +21,16 @@ from simple_agent import MAAgent
 from parl.algorithms import MADDPG
 from parl.env.multiagent_simple_env import MAenv
 from parl.utils import logger, summary
+import cv2
 
-CRITIC_LR = 0.01  # learning rate for the critic model
-ACTOR_LR = 0.01  # learning rate of the actor model
-GAMMA = 0.95  # reward discount factor
+CRITIC_LR = 0.01 #1e-4 #0.01  # learning rate for the critic model
+ACTOR_LR = 0.01 #1e-4 #0.01  # learning rate of the actor model
+GAMMA = 0.95 #0.9 #0.95  # reward discount factor
 TAU = 0.01  # soft update
 BATCH_SIZE = 1024
 MAX_EPISODES = 25000  # stop condition:number of episodes
-MAX_STEP_PER_EPISODE = 25  # maximum step per episode
-STAT_RATE = 1000  # statistical interval of save model or count reward
-
+MAX_STEP_PER_EPISODE = 50 #25  # maximum step per episode
+STAT_RATE = 1000 # 1000 # statistical interval of save model or count reward
 
 def run_episode(env, agents):
     obs_n = env.reset()
@@ -64,6 +64,12 @@ def run_episode(env, agents):
             time.sleep(0.1)
             env.render()
 
+        # get world's image
+        # w = env.get_world_array()
+        # cv2.imshow('My Image', cv2.cvtColor(w[0], cv2.COLOR_RGB2BGR))
+        # if cv2.waitKey(1) & 0xFF == ord('q'):
+        #     break
+
         # show model effect without training
         if args.restore and args.show:
             continue
@@ -79,7 +85,7 @@ def run_episode(env, agents):
 
 
 def train_agent():
-    env = MAenv(args.env)
+    env = MAenv(args.env, args.num)
     logger.info('agent num: {}'.format(env.n))
     logger.info('observation_space: {}'.format(env.observation_space))
     logger.info('action_space: {}'.format(env.action_space))
@@ -208,8 +214,17 @@ if __name__ == '__main__':
         type=str,
         default='./model',
         help='directory for saving model')
+    parser.add_argument(
+        '--num',
+        type=int,
+        default=4,
+        help='amount of agents & landmarks')
 
     args = parser.parse_args()
     logger.set_dir('./train_log/' + str(args.env))
 
+    # cv2.namedWindow('My Image', cv2.WINDOW_NORMAL)
+
     train_agent()
+
+    # cv2.destroyAllWindows()

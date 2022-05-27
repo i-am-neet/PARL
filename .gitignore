@@ -109,3 +109,5 @@ saved_model/
 model/
 train_log/
 
+# vscode
+.vscode

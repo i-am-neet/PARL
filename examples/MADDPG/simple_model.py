@@ -46,7 +46,9 @@ class ActorModel(parl.Model):
         super(ActorModel, self).__init__()
         hid1_size = 128
         hid2_size = 128
-        hid3_size = 64
+        hid3_size = 128
+        hid4_size = 128
+        hid5_size = 128
         self.continuous_actions = continuous_actions
         self.fc1 = nn.Linear(
             obs_dim,
@@ -65,11 +67,21 @@ class ActorModel(parl.Model):
                 initializer=paddle.nn.initializer.XavierUniform()))
         self.fc4 = nn.Linear(
             hid3_size,
+            hid4_size,
+            weight_attr=paddle.ParamAttr(
+                initializer=paddle.nn.initializer.XavierUniform()))
+        self.fc5 = nn.Linear(
+            hid4_size,
+            hid5_size,
+            weight_attr=paddle.ParamAttr(
+                initializer=paddle.nn.initializer.XavierUniform()))
+        self.fc6 = nn.Linear(
+            hid5_size,
             act_dim,
             weight_attr=paddle.ParamAttr(
                 initializer=paddle.nn.initializer.XavierUniform()))
         if self.continuous_actions:
-            std_hid_size = 64
+            std_hid_size = 128
             self.std_fc = nn.Linear(
                 std_hid_size,
                 act_dim,
@@ -77,12 +89,14 @@ class ActorModel(parl.Model):
                     initializer=paddle.nn.initializer.XavierUniform()))
 
     def forward(self, obs):
-        hid1 = F.relu(self.fc1(obs))
-        hid2 = F.relu(self.fc2(hid1))
-        hid3 = F.relu(self.fc3(hid2))
-        means = self.fc4(hid3)
+        hid1 = F.leaky_relu(self.fc1(obs))
+        hid2 = F.leaky_relu(self.fc2(hid1))
+        hid3 = F.leaky_relu(self.fc3(hid2))
+        hid4 = F.leaky_relu(self.fc4(hid3))
+        hid5 = F.leaky_relu(self.fc5(hid4))
+        means = self.fc6(hid5)
         if self.continuous_actions:
-            act_std = self.std_fc(hid2)
+            act_std = self.std_fc(hid5)
             return (means, act_std)
         return means
 
@@ -92,7 +106,9 @@ class CriticModel(parl.Model):
         super(CriticModel, self).__init__()
         hid1_size = 128
         hid2_size = 128
-        hid3_size = 64
+        hid3_size = 128
+        hid4_size = 128
+        hid5_size = 128
         out_dim = 1
         self.fc1 = nn.Linear(
             critic_in_dim,
@@ -111,15 +127,27 @@ class CriticModel(parl.Model):
                 initializer=paddle.nn.initializer.XavierUniform()))
         self.fc4 = nn.Linear(
             hid3_size,
+            hid4_size,
+            weight_attr=paddle.ParamAttr(
+                initializer=paddle.nn.initializer.XavierUniform()))
+        self.fc5 = nn.Linear(
+            hid4_size,
+            hid5_size,
+            weight_attr=paddle.ParamAttr(
+                initializer=paddle.nn.initializer.XavierUniform()))
+        self.fc6 = nn.Linear(
+            hid5_size,
             out_dim,
             weight_attr=paddle.ParamAttr(
                 initializer=paddle.nn.initializer.XavierUniform()))
 
     def forward(self, obs_n, act_n):
         inputs = paddle.concat(obs_n + act_n, axis=1)
-        hid1 = F.relu(self.fc1(inputs))
-        hid2 = F.relu(self.fc2(hid1))
-        hid3 = F.relu(self.fc3(hid2))
-        Q = self.fc4(hid3)
+        hid1 = F.leaky_relu(self.fc1(inputs))
+        hid2 = F.leaky_relu(self.fc2(hid1))
+        hid3 = F.leaky_relu(self.fc3(hid2))
+        hid4 = F.leaky_relu(self.fc4(hid3))
+        hid5 = F.leaky_relu(self.fc5(hid4))
+        Q = self.fc6(hid5)
         Q = paddle.squeeze(Q, axis=1)
         return Q

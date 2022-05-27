@@ -107,6 +107,7 @@ venv/
 # trained model
 saved_model/
 model/
+model_*/
 train_log/
 
 # vscode

@@ -205,7 +205,7 @@ def train_agent():
                 model_dir = args.model_dir
                 os.makedirs(os.path.dirname(model_dir), exist_ok=True)
                 for i in range(len(agents)):
-                    model_name = '/agent_' + str(i)
+                    model_name = '/agent_' + str(i) + '_ep' + str(total_episodes)
                     agents[i].save(model_dir + model_name)
 
 
@@ -251,7 +251,7 @@ if __name__ == '__main__':
     if not args.restore:
         logger.set_dir(f'./train_log/{args.model_dir}/' + str(args.env))
     else:
-        logger.set_dir(f'./train_log/restore_{args.model_dir}/' + str(args.env))
+        logger.set_dir(f'./train_log/restore/{args.model_dir}/' + str(args.env))
 
     # cv2.namedWindow('My Image', cv2.WINDOW_NORMAL)
 

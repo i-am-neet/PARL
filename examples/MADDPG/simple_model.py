@@ -44,11 +44,11 @@ class MAModel(parl.Model):
 class ActorModel(parl.Model):
     def __init__(self, obs_dim, act_dim, continuous_actions=False):
         super(ActorModel, self).__init__()
-        hid1_size = 128
-        hid2_size = 128
-        hid3_size = 128
-        hid4_size = 128
-        hid5_size = 128
+        hid1_size = 256
+        hid2_size = 256
+        hid3_size = 256
+        hid4_size = 256
+        hid5_size = 256
         self.continuous_actions = continuous_actions
         self.fc1 = nn.Linear(
             obs_dim,
@@ -104,11 +104,11 @@ class ActorModel(parl.Model):
 class CriticModel(parl.Model):
     def __init__(self, critic_in_dim):
         super(CriticModel, self).__init__()
-        hid1_size = 128
-        hid2_size = 128
-        hid3_size = 128
-        hid4_size = 128
-        hid5_size = 128
+        hid1_size = 256
+        hid2_size = 256
+        hid3_size = 256
+        hid4_size = 256
+        hid5_size = 256
         out_dim = 1
         self.fc1 = nn.Linear(
             critic_in_dim,

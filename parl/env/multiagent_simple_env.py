@@ -23,21 +23,22 @@ try:
         """ multiagent environment warppers for maddpg
         """
 
-        def __init__(self, scenario_name):
+        def __init__(self, scenario_name, amount):
             env_list = [
                 'simple', 'simple_adversary', 'simple_crypto', 'simple_push',
                 'simple_reference', 'simple_speaker_listener', 'simple_spread',
-                'simple_tag', 'simple_world_comm'
+                'simple_tag', 'simple_world_comm', 'simple_spread_room'
             ]
             assert scenario_name in env_list, 'Env {} not found (valid envs include {})'.format(
                 scenario_name, env_list)
             # load scenario from script
             scenario = scenarios.load(scenario_name + ".py").Scenario()
             # create world
-            world = scenario.make_world()
+            world = scenario.make_world(amount)
             # initial multiagent environment
             super().__init__(world, scenario.reset_world, scenario.reward,
-                             scenario.observation)
+                             scenario.observation, info_callback=None,
+                             done_callback=scenario.done, shared_viewer=True)
             self.obs_shape_n = [
                 self.get_shape(self.observation_space[i])
                 for i in range(self.n)

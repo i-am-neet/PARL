@@ -19,6 +19,7 @@ import numpy as np
 from simple_model import MAModel
 from simple_agent import MAAgent
 from parl.algorithms import MADDPG
+# TODO multiagent_simple_env will be deprecated
 # from parl.env.multiagent_env import MAenv
 from parl.env.multiagent_simple_env import MAenv
 from parl.utils import logger, summary

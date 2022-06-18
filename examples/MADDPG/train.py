@@ -32,7 +32,7 @@ GAMMA = 0.95 #0.9 #0.95  # reward discount factor
 TAU = 0.01  # soft update
 BATCH_SIZE = 1024
 MAX_EPISODES = 60e+3 #25000  # stop condition:number of episodes
-MAX_STEP_PER_EPISODE = 200 #25  # maximum step per episode
+MAX_STEP_PER_EPISODE = 100 #25  # maximum step per episode
 STAT_RATE = 1000 # 1000 # statistical interval of save model or count reward
 
 def run_episode(env, agents):
@@ -42,7 +42,10 @@ def run_episode(env, agents):
     steps = 0
     while True:
         steps += 1
+        expert_action_n = env.get_expert_action_n()
         action_n = [agent.predict(obs) for agent, obs in zip(agents, obs_n)]
+        if True: # test expert
+            action_n = expert_action_n
         next_obs_n, reward_n, done_n, _ = env.step(action_n)
         done = all(done_n)
         terminal = (steps >= MAX_STEP_PER_EPISODE)

@@ -48,7 +48,8 @@ def run_episode(env, agents):
             action_n = expert_action_n
         next_obs_n, reward_n, done_n, info_n = env.step(action_n)
         if any(info_n['n']):
-            print(info_n['n'])
+            #print(f"At step {steps}: {info_n['n']}")
+            pass
         done = all(done_n)
         terminal = (steps >= MAX_STEP_PER_EPISODE)
 

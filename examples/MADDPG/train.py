@@ -46,7 +46,9 @@ def run_episode(env, agents):
         action_n = [agent.predict(obs) for agent, obs in zip(agents, obs_n)]
         if False: # test expert
             action_n = expert_action_n
-        next_obs_n, reward_n, done_n, _ = env.step(action_n)
+        next_obs_n, reward_n, done_n, info_n = env.step(action_n)
+        if any(info_n['n']):
+            print(info_n['n'])
         done = all(done_n)
         terminal = (steps >= MAX_STEP_PER_EPISODE)
 

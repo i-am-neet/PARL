@@ -36,7 +36,7 @@ MAX_STEP_PER_EPISODE = 100 #25  # maximum step per episode
 STAT_RATE = 1000 # 1000 # statistical interval of save model or count reward
 
 def run_episode(env, agents):
-    obs_n = env.reset() if not args.restore else env.reset(testing=True)
+    obs_n = env.reset(testing=True) if args.restore and args.show else env.reset()
     total_reward = 0
     agents_reward = [0 for _ in range(env.n)]
     steps = 0
@@ -48,8 +48,7 @@ def run_episode(env, agents):
             action_n = expert_action_n
         next_obs_n, reward_n, done_n, info_n = env.step(action_n)
         if any(info_n['n']):
-            #print(f"At step {steps}: {info_n['n']}")
-            pass
+            print(f"At step {steps}: {info_n['n']}")
         done = all(done_n)
         terminal = (steps >= MAX_STEP_PER_EPISODE)
 

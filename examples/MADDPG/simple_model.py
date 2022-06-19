@@ -50,8 +50,8 @@ class ActorModel(parl.Model):
         # gridmap is flatten of (grid size * grid size)
         # where grid size is default 9
         # Or using -1 to auto-detect
-        self.collaborate_dim_1 = 81
-        self.collaborate_dim_2 = 81
+        self.collaborate_dim_1 = 441
+        self.collaborate_dim_2 = 441
         assert (self.personal_dim + self.collaborate_dim_1 + self.collaborate_dim_2) == obs_dim
         super(ActorModel, self).__init__()
         hid1_size = 256

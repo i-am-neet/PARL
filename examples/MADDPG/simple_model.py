@@ -45,20 +45,19 @@ class ActorModel(parl.Model):
     def __init__(self, obs_dim, act_dim, continuous_actions=False):
         # personal_dim is contain p_vel, p_pos, goal_pos, lidars, next_dir, and A*'s route
         # equation is : world_dim + world_dim + world_dim + amount of scan + world_dim + route's size * world_dim
-        self.personal_dim = 36
+        self.personal_dim = 14
         # collaborate_dim is contain other_gridmap() & other_plan_gridmap()
         # gridmap is flatten of (grid size * grid size)
         # where grid size is default 9
         # Or using -1 to auto-detect
-        self.collaborate_dim_1 = 441
-        self.collaborate_dim_2 = 441
-        assert (self.personal_dim + self.collaborate_dim_1 + self.collaborate_dim_2) == obs_dim
+        self.plan_dim = 10
+        self.lidar_dim = 12
+        self.collaborate_dim_1 = 441 + 441
+        assert (self.personal_dim + self.plan_dim + self.lidar_dim + self.collaborate_dim_1) == obs_dim
         super(ActorModel, self).__init__()
-        hid1_size = 256
-        hid2_size = 256
-        hid3_size = 256
-        hid4_size = 256
-        hid5_size = 256
+        hid1_size = 512
+        hid2_size = 512
+        hid3_size = 512
         self.continuous_actions = continuous_actions
         self.personal_model = nn.Sequential(
             nn.Linear(self.personal_dim, hid1_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
@@ -67,10 +66,22 @@ class ActorModel(parl.Model):
             nn.LeakyReLU(),
             nn.Linear(hid2_size, hid3_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
             nn.LeakyReLU(),
-            nn.Linear(hid3_size, hid4_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
+        )
+        self.plan_model = nn.Sequential(
+            nn.Linear(self.plan_dim, hid1_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
             nn.LeakyReLU(),
-            nn.Linear(hid4_size, hid5_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
-            nn.LeakyReLU()
+            nn.Linear(hid1_size, hid2_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
+            nn.LeakyReLU(),
+            nn.Linear(hid2_size, hid3_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
+            nn.LeakyReLU(),
+        )
+        self.lidar_model = nn.Sequential(
+            nn.Linear(self.lidar_dim, hid1_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
+            nn.LeakyReLU(),
+            nn.Linear(hid1_size, hid2_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
+            nn.LeakyReLU(),
+            nn.Linear(hid2_size, hid3_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
+            nn.LeakyReLU(),
         )
         self.collaborate_model_1 = nn.Sequential(
             nn.Linear(self.collaborate_dim_1, hid1_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
@@ -79,32 +90,16 @@ class ActorModel(parl.Model):
             nn.LeakyReLU(),
             nn.Linear(hid2_size, hid3_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
             nn.LeakyReLU(),
-            nn.Linear(hid3_size, hid4_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
-            nn.LeakyReLU(),
-            nn.Linear(hid4_size, hid5_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
-            nn.LeakyReLU()
-        )
-        self.collaborate_model_2 = nn.Sequential(
-            nn.Linear(self.collaborate_dim_2, hid1_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
-            nn.LeakyReLU(),
-            nn.Linear(hid1_size, hid2_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
-            nn.LeakyReLU(),
-            nn.Linear(hid2_size, hid3_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
-            nn.LeakyReLU(),
-            nn.Linear(hid3_size, hid4_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
-            nn.LeakyReLU(),
-            nn.Linear(hid4_size, hid5_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
-            nn.LeakyReLU()
         )
         self.mixed_model = nn.Sequential(
-            nn.Linear(hid5_size + hid5_size + hid5_size, hid1_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
+            nn.Linear(hid3_size + hid3_size + hid3_size + hid3_size, hid1_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
             nn.LeakyReLU(),
             nn.Linear(hid1_size, hid2_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
             nn.LeakyReLU(),
             nn.Linear(hid2_size, act_dim, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
         )
         if self.continuous_actions:
-            std_hid_size = hid5_size + hid5_size + hid5_size
+            std_hid_size = hid5_size + hid5_size
             self.std_fc = nn.Linear(
                 std_hid_size,
                 act_dim,
@@ -112,11 +107,12 @@ class ActorModel(parl.Model):
                     initializer=paddle.nn.initializer.XavierUniform()))
 
     def forward(self, obs):
-        i1, i2, i3 = paddle.split(obs, [self.personal_dim, self.collaborate_dim_1, self.collaborate_dim_2], axis=-1)
+        i1, i2, i3, i4 = paddle.split(obs, [self.personal_dim, self.plan_dim, self.lidar_dim, self.collaborate_dim_1], axis=-1)
         o1 = self.personal_model(i1)
-        o2 = self.collaborate_model_1(i2)
-        o3 = self.collaborate_model_2(i3)
-        means = self.mixed_model(paddle.concat([o1, o2, o3], axis=-1))
+        o2 = self.plan_model(i2)
+        o3 = self.lidar_model(i3)
+        o4 = self.collaborate_model_1(i4)
+        means = self.mixed_model(paddle.concat([o1, o2, o3, o4], axis=-1))
         if self.continuous_actions:
             act_std = self.std_fc(hid5)
             return (means, act_std)
@@ -126,11 +122,11 @@ class ActorModel(parl.Model):
 class CriticModel(parl.Model):
     def __init__(self, critic_in_dim):
         super(CriticModel, self).__init__()
-        hid1_size = 256
-        hid2_size = 256
-        hid3_size = 256
-        hid4_size = 256
-        hid5_size = 256
+        hid1_size = 512
+        hid2_size = 512
+        hid3_size = 512
+        hid4_size = 512
+        hid5_size = 512
         out_dim = 1
         self.fc1 = nn.Linear(
             critic_in_dim,

@@ -33,20 +33,40 @@ TAU = 0.01  # soft update
 BATCH_SIZE = 1024
 MAX_EPISODES = 60e+3 #25000  # stop condition:number of episodes
 MAX_STEP_PER_EPISODE = 100 #25  # maximum step per episode
-STAT_RATE = 1000 # 1000 # statistical interval of save model or count reward
+STAT_RATE = 200 # 1000 # statistical interval of save model or count reward
+
+LAST_DATA_SIZE = 441
+
+def expert_control(expert_a, agent_a):
+    e_u_index = np.argmax(expert_a)
+    a_u_index = np.argmax(agent_a)
+    ctrl_action = np.zeros(9)
+    ctrl_index = 0
+    if a_u_index == 0: ctrl_index = 0 # stop
+    if a_u_index == 1: ctrl_index = e_u_index # same way
+    if a_u_index == 2: ctrl_index = (e_u_index + 4)%8 if (e_u_index + 4)%8 !=0 else 8 # inverse way
+    if a_u_index == 3: ctrl_index = (e_u_index - 2)%8 if (e_u_index - 2)%8 !=0 else 8 # right way
+    if a_u_index == 4: ctrl_index = (e_u_index + 2)%8 if (e_u_index + 2)%8 !=0 else 8 # left way
+    ctrl_action[ctrl_index] = 1
+    return ctrl_action
 
 def run_episode(env, agents):
     obs_n = env.reset(testing=True) if args.restore and args.show else env.reset()
     total_reward = 0
     agents_reward = [0 for _ in range(env.n)]
     steps = 0
+    last_image_n = [np.split(o, [-LAST_DATA_SIZE])[-1] for o in obs_n]
+    obs_n = [np.concatenate((o, i)) for o, i in zip(obs_n, last_image_n)]
     while True:
         steps += 1
         expert_action_n = env.get_expert_action_n()
         action_n = [agent.predict(obs) for agent, obs in zip(agents, obs_n)]
         if False: # test expert
-            action_n = expert_action_n
+            ctrl_action_n = [expert_control(e_a, a_a) for e_a, a_a in zip(expert_action_n, action_n)]
+        # next_obs_n, reward_n, done_n, info_n = env.step(ctrl_action_n)
         next_obs_n, reward_n, done_n, info_n = env.step(action_n)
+        last_image_n = [np.split(o, [-LAST_DATA_SIZE*2, -LAST_DATA_SIZE])[-2] for o in obs_n]
+        next_obs_n = [np.concatenate((o, i)) for o, i in zip(next_obs_n, last_image_n)]
         if any(info_n['n']):
             print(f"At step {steps}: {info_n['n']}")
         done = all(done_n)

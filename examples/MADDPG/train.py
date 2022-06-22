@@ -54,7 +54,7 @@ MAX_EPISODES = 60e+3 #25000  # stop condition:number of episodes
 MAX_STEP_PER_EPISODE = 100 #25  # maximum step per episode
 STAT_RATE = 200 # 1000 # statistical interval of save model or count reward
 
-LAST_DATA_SIZE = 441
+LAST_DATA_SIZE = 81
 
 def expert_control(expert_a, agent_a):
     e_u_index = np.argmax(expert_a)
@@ -95,10 +95,10 @@ def run_episode(env, agents):
         steps += 1
         expert_action_n = env.get_expert_action_n()
         action_n = [agent.predict(obs) for agent, obs in zip(agents, obs_n)]
-        if True: # test expert
+        if False: # test expert
             ctrl_action_n = [expert_control(e_a, a_a) for e_a, a_a in zip(expert_action_n, action_n)]
-        next_obs_n, reward_n, done_n, info_n = env.step(ctrl_action_n)
-        # next_obs_n, reward_n, done_n, info_n = env.step(action_n)
+        # next_obs_n, reward_n, done_n, info_n = env.step(ctrl_action_n)
+        next_obs_n, reward_n, done_n, info_n = env.step(action_n)
         last_image_n = [np.split(o, [-LAST_DATA_SIZE*2, -LAST_DATA_SIZE])[-2] for o in obs_n]
         next_obs_n = [np.concatenate((o, i)) for o, i in zip(next_obs_n, last_image_n)]
         # if any(info_n['n']):

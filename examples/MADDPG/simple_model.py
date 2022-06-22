@@ -17,6 +17,7 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
+LAST_IMAGE_SIZE = 81
 
 class MAModel(parl.Model):
     def __init__(self,
@@ -45,66 +46,56 @@ class ActorModel(parl.Model):
     def __init__(self, obs_dim, act_dim, continuous_actions=False):
         # personal_dim is contain p_vel, p_pos, goal_pos, lidars, next_dir, and A*'s route
         # equation is : world_dim + world_dim + world_dim + amount of scan + world_dim + route's size * world_dim
-        self.personal_dim = 14
+        self.personal_dim = 8
         # collaborate_dim is contain other_gridmap() & other_plan_gridmap()
         # gridmap is flatten of (grid size * grid size)
         # where grid size is default 9
         # Or using -1 to auto-detect
-        self.plan_dim = 10
+        self.plan_dim = 16
         self.lidar_dim = 12
-        self.collaborate_dim_1 = 441 + 441
+        self.collaborate_dim_1 = LAST_IMAGE_SIZE + LAST_IMAGE_SIZE
         assert (self.personal_dim + self.plan_dim + self.lidar_dim + self.collaborate_dim_1) == obs_dim
         super(ActorModel, self).__init__()
-        hid1_size = 512
-        hid2_size = 512
-        hid3_size = 512
         self.continuous_actions = continuous_actions
         self.personal_model = nn.Sequential(
-            nn.Linear(self.personal_dim, hid1_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
+            nn.Linear(self.personal_dim, 32, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
             nn.LeakyReLU(),
-            nn.Linear(hid1_size, hid2_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
+            nn.Linear(32, 32, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
             nn.LeakyReLU(),
-            nn.Linear(hid2_size, hid3_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
+            nn.Linear(32, 8, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
             nn.LeakyReLU(),
         )
         self.plan_model = nn.Sequential(
-            nn.Linear(self.plan_dim, hid1_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
+            nn.Linear(self.plan_dim, 64, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
             nn.LeakyReLU(),
-            nn.Linear(hid1_size, hid2_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
+            nn.Linear(64, 64, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
             nn.LeakyReLU(),
-            nn.Linear(hid2_size, hid3_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
+            nn.Linear(64, 16, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
             nn.LeakyReLU(),
         )
         self.lidar_model = nn.Sequential(
-            nn.Linear(self.lidar_dim, hid1_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
+            nn.Linear(self.lidar_dim, 64, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
             nn.LeakyReLU(),
-            nn.Linear(hid1_size, hid2_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
+            nn.Linear(64, 64, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
             nn.LeakyReLU(),
-            nn.Linear(hid2_size, hid3_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
+            nn.Linear(64, 16, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
             nn.LeakyReLU(),
         )
         self.collaborate_model_1 = nn.Sequential(
-            nn.Linear(self.collaborate_dim_1, hid1_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
+            nn.Linear(self.collaborate_dim_1, 256, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
             nn.LeakyReLU(),
-            nn.Linear(hid1_size, hid2_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
+            nn.Linear(256, 256, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
             nn.LeakyReLU(),
-            nn.Linear(hid2_size, hid3_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
+            nn.Linear(256, 100, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
             nn.LeakyReLU(),
         )
         self.mixed_model = nn.Sequential(
-            nn.Linear(hid3_size + hid3_size + hid3_size + hid3_size, hid1_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
+            nn.Linear(8 + 16 + 16 + 100, 256, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
             nn.LeakyReLU(),
-            nn.Linear(hid1_size, hid2_size, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
+            nn.Linear(256, 128, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
             nn.LeakyReLU(),
-            nn.Linear(hid2_size, act_dim, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
+            nn.Linear(128, act_dim, weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierUniform())),
         )
-        if self.continuous_actions:
-            std_hid_size = hid5_size + hid5_size
-            self.std_fc = nn.Linear(
-                std_hid_size,
-                act_dim,
-                weight_attr=paddle.ParamAttr(
-                    initializer=paddle.nn.initializer.XavierUniform()))
 
     def forward(self, obs):
         i1, i2, i3, i4 = paddle.split(obs, [self.personal_dim, self.plan_dim, self.lidar_dim, self.collaborate_dim_1], axis=-1)
@@ -124,9 +115,6 @@ class CriticModel(parl.Model):
         super(CriticModel, self).__init__()
         hid1_size = 512
         hid2_size = 512
-        hid3_size = 512
-        hid4_size = 512
-        hid5_size = 512
         out_dim = 1
         self.fc1 = nn.Linear(
             critic_in_dim,
@@ -140,21 +128,6 @@ class CriticModel(parl.Model):
                 initializer=paddle.nn.initializer.XavierUniform()))
         self.fc3 = nn.Linear(
             hid2_size,
-            hid3_size,
-            weight_attr=paddle.ParamAttr(
-                initializer=paddle.nn.initializer.XavierUniform()))
-        self.fc4 = nn.Linear(
-            hid3_size,
-            hid4_size,
-            weight_attr=paddle.ParamAttr(
-                initializer=paddle.nn.initializer.XavierUniform()))
-        self.fc5 = nn.Linear(
-            hid4_size,
-            hid5_size,
-            weight_attr=paddle.ParamAttr(
-                initializer=paddle.nn.initializer.XavierUniform()))
-        self.fc6 = nn.Linear(
-            hid5_size,
             out_dim,
             weight_attr=paddle.ParamAttr(
                 initializer=paddle.nn.initializer.XavierUniform()))
@@ -163,9 +136,6 @@ class CriticModel(parl.Model):
         inputs = paddle.concat(obs_n + act_n, axis=1)
         hid1 = F.leaky_relu(self.fc1(inputs))
         hid2 = F.leaky_relu(self.fc2(hid1))
-        hid3 = F.leaky_relu(self.fc3(hid2))
-        hid4 = F.leaky_relu(self.fc4(hid3))
-        hid5 = F.leaky_relu(self.fc5(hid4))
-        Q = self.fc6(hid5)
+        Q = self.fc3(hid2)
         Q = paddle.squeeze(Q, axis=1)
         return Q

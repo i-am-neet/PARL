@@ -25,6 +25,25 @@ from parl.env.multiagent_simple_env import MAenv
 from parl.utils import logger, summary
 import cv2
 from gym import spaces
+import logging
+
+formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+
+def setup_logger(name, log_file, level=logging.INFO):
+    """To setup as many loggers as you want"""
+
+    handler = logging.FileHandler(log_file)        
+    handler.setFormatter(formatter)
+
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+    logger.addHandler(handler)
+
+    return logger
+
+logging_counter = 0
+total_cost_time_n = 0
+total_collide_times_n = 0
 
 CRITIC_LR = 0.01 #1e-4 #0.01  # learning rate for the critic model
 ACTOR_LR = 0.01 #1e-4 #0.01  # learning rate of the actor model
@@ -50,6 +69,21 @@ def expert_control(expert_a, agent_a):
     ctrl_action[ctrl_index] = 1
     return ctrl_action
 
+def random_expert(expert_action_n):
+    p_n = []
+    for e in expert_action_n:
+        p = np.zeros(9)
+        p[np.argmax(e)] = 0.6
+        p[(np.argmax(e)-1)%9] = 0.2
+        p[(np.argmax(e)+1)%9] = 0.2
+        p_n.append(p)
+    random_index_n = [np.random.choice([0,1,2,3,4,5,6,7,8], p=p) for p in p_n]
+    random_expert_action_n = []
+    for ri in random_index_n:
+        z = np.zeros(9)
+        z[ri] = 1
+        random_expert_action_n.append(z)
+
 def run_episode(env, agents):
     obs_n = env.reset(testing=True) if args.restore and args.show else env.reset()
     total_reward = 0
@@ -61,14 +95,14 @@ def run_episode(env, agents):
         steps += 1
         expert_action_n = env.get_expert_action_n()
         action_n = [agent.predict(obs) for agent, obs in zip(agents, obs_n)]
-        if False: # test expert
+        if True: # test expert
             ctrl_action_n = [expert_control(e_a, a_a) for e_a, a_a in zip(expert_action_n, action_n)]
-        # next_obs_n, reward_n, done_n, info_n = env.step(ctrl_action_n)
-        next_obs_n, reward_n, done_n, info_n = env.step(action_n)
+        next_obs_n, reward_n, done_n, info_n = env.step(ctrl_action_n)
+        # next_obs_n, reward_n, done_n, info_n = env.step(action_n)
         last_image_n = [np.split(o, [-LAST_DATA_SIZE*2, -LAST_DATA_SIZE])[-2] for o in obs_n]
         next_obs_n = [np.concatenate((o, i)) for o, i in zip(next_obs_n, last_image_n)]
-        if any(info_n['n']):
-            print(f"At step {steps}: {info_n['n']}")
+        # if any(info_n['n']):
+        #     print(f"At step {steps}: {info_n['n']}")
         done = all(done_n)
         terminal = (steps >= MAX_STEP_PER_EPISODE)
 
@@ -85,6 +119,24 @@ def run_episode(env, agents):
 
         # check the end of an episode
         if done or terminal:
+            if args.restore:
+                global total_cost_time_n, total_collide_times_n, logging_counter
+                cost_time_n, collid_times_n = env.get_info()
+                eval_logger.info(logging_counter)
+                eval_logger.info(f"COST TIME")
+                eval_logger.info(f"---------")
+                eval_logger.info(f"{cost_time_n}\n")
+                eval_logger.info(f"COLLISION TIMES")
+                eval_logger.info(f"---------------")
+                eval_logger.info(f"{collid_times_n}\n")
+                total_cost_time_n = total_cost_time_n + np.array(cost_time_n)
+                total_collide_times_n = total_collide_times_n + np.array(collid_times_n)
+                logging_counter+=1
+                if logging_counter%100 == 0:
+                    eval_logger.info(f"mean cost time: {total_cost_time_n / 100}")
+                    eval_logger.info(f"mean collide times: {total_collide_times_n / 100}")
+                    total_cost_time_n = 0
+                    total_collide_times_n = 0
             break
 
         # show animation
@@ -278,6 +330,8 @@ if __name__ == '__main__':
         logger.set_dir(f'./train_log/{args.model_dir}/' + str(args.env))
     else:
         logger.set_dir(f'./train_log/restore/{args.model_dir}/' + str(args.env))
+
+    eval_logger = setup_logger('eval_logger', f'./evals/{args.num}_agents_room0_4.log')
 
     # cv2.namedWindow('My Image', cv2.WINDOW_NORMAL)
 

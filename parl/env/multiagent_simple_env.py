@@ -37,7 +37,7 @@ try:
             world = scenario.make_world(amount)
             # initial multiagent environment
             super().__init__(world, scenario.reset_world, scenario.reward,
-                             scenario.observation, info_callback=None, done_callback=scenario.done, shared_viewer=True,
+                             scenario.observation, info_callback=scenario.info, done_callback=scenario.done, shared_viewer=True,
                              expert_callback=scenario.expert_action)
             self.obs_shape_n = [
                 self.get_shape(self.observation_space[i])

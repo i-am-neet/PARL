@@ -51,10 +51,47 @@ GAMMA = 0.95 #0.9 #0.95  # reward discount factor
 TAU = 0.01  # soft update
 BATCH_SIZE = 1024
 MAX_EPISODES = 60e+3 #25000  # stop condition:number of episodes
-MAX_STEP_PER_EPISODE = 100 #25  # maximum step per episode
+MAX_STEP_PER_EPISODE = 250#100 #25  # maximum step per episode
 STAT_RATE = 200 # 1000 # statistical interval of save model or count reward
 
 LAST_DATA_SIZE = 81
+
+def near_has_agent(agent, obs_n):
+    pa = obs_n[agent.agent_index][2:4]
+    for i in range(len(obs_n)):
+        pb = obs_n[i][2:4]
+        if i == agent.agent_index: continue
+        if np.linalg.norm(pa - pb) < 0.22:
+            return True
+    return False
+
+def advice_control(obs_n, action_n):
+    for i in range(len(obs_n)):
+        for j in range(i+1, len(obs_n)):
+            pa = obs_n[i][2:4]
+            pb = obs_n[j][2:4]
+            if np.linalg.norm(pa - pb) < 0.1:
+                a_action = np.zeros(9)
+                b_action = np.zeros(9)
+                a_u_index = np.argmax(action_n[i])
+                b_u_index = np.argmax(action_n[j])
+                a_c_index = 0
+                b_c_index = 0
+                if b_u_index == 0:
+                    i1 = (a_u_index - 2)%8 if (a_u_index - 2)%8 !=0 else 8 # right way
+                    i2 = (a_u_index + 2)%8 if (a_u_index + 2)%8 !=0 else 8 # left way
+                    i3 = (a_u_index + 4)%8 if (a_u_index + 4)%8 !=0 else 8 # inverse way
+                    a_c_index = np.random.choice([0, i1, i2, i3])
+                    a_action[a_c_index] = 1
+                    action_n[i] = a_action
+                else:
+                    i1 = (b_u_index - 2)%8 if (b_u_index - 2)%8 !=0 else 8 # right way
+                    i2 = (b_u_index + 2)%8 if (b_u_index + 2)%8 !=0 else 8 # left way
+                    i3 = (b_u_index + 4)%8 if (b_u_index + 4)%8 !=0 else 8 # inverse way
+                    b_c_index = np.random.choice([0, i1, i2, i3])
+                    b_action[b_c_index] = 1
+                    action_n[j] = b_action
+    return action_n
 
 def expert_control(expert_a, agent_a):
     e_u_index = np.argmax(expert_a)
@@ -97,8 +134,20 @@ def run_episode(env, agents):
         action_n = [agent.predict(obs) for agent, obs in zip(agents, obs_n)]
         if False: # test expert
             ctrl_action_n = [expert_control(e_a, a_a) for e_a, a_a in zip(expert_action_n, action_n)]
-        # next_obs_n, reward_n, done_n, info_n = env.step(ctrl_action_n)
-        next_obs_n, reward_n, done_n, info_n = env.step(action_n)
+            next_obs_n, reward_n, done_n, info_n = env.step(ctrl_action_n)
+        elif False: # advice
+            advice_control_n = advice_control(obs_n, action_n)
+            next_obs_n, reward_n, done_n, info_n = env.step(advice_control_n)
+        elif False: # advice w/ expert
+            advice_control_n = advice_control(obs_n, expert_action_n)
+            next_obs_n, reward_n, done_n, info_n = env.step(advice_control_n)
+        elif True: # switch by check nearest
+            for i in range(env.n):
+                action_n[i] = action_n[i] if near_has_agent(agents[i], obs_n) else expert_action_n[i]
+            next_obs_n, reward_n, done_n, info_n = env.step(action_n)
+        else:
+            # Normal
+            next_obs_n, reward_n, done_n, info_n = env.step(action_n)
         last_image_n = [np.split(o, [-LAST_DATA_SIZE*2, -LAST_DATA_SIZE])[-2] for o in obs_n]
         next_obs_n = [np.concatenate((o, i)) for o, i in zip(next_obs_n, last_image_n)]
         # if any(info_n['n']):
@@ -141,7 +190,7 @@ def run_episode(env, agents):
 
         # show animation
         if args.show:
-            time.sleep(0.1)
+            time.sleep(0.01)
             env.render()
 
         # get world's image
@@ -216,7 +265,8 @@ def train_agent():
     episode_rewards = []  # sum of rewards for all agents
     agent_rewards = [[] for _ in range(env.n)]  # individual agent reward
 
-    if args.restore:
+    # if args.restore:
+    if False:
         # restore model
         for i in range(len(agents)):
             model_file = args.model_dir + '/agent_' + str(i)
@@ -224,6 +274,15 @@ def train_agent():
                 raise Exception(
                     'model file {} does not exits'.format(model_file))
             agents[i].restore(model_file)
+
+    # restore model & fine tune
+    for i in range(len(agents)):
+        model_file = './tuned_model/agent_' + str(i)
+        print(f"fine tune: {model_file}")
+        if not os.path.exists(model_file):
+            raise Exception(
+                'model file {} does not exits'.format(model_file))
+        agents[i].restore(model_file)
 
     t_start = time.time()
     logger.info('Starting...')
@@ -331,7 +390,8 @@ if __name__ == '__main__':
     else:
         logger.set_dir(f'./train_log/restore/{args.model_dir}/' + str(args.env))
 
-    eval_logger = setup_logger('eval_logger', f'./evals/{args.num}_agents_room0_4.log')
+    from datetime import datetime
+    eval_logger = setup_logger('eval_logger', f"./evals/{args.num}_agents_{datetime.strftime(datetime.now(),'%Y-%m-%d_%H:%M')}.log")
 
     # cv2.namedWindow('My Image', cv2.WINDOW_NORMAL)
 
